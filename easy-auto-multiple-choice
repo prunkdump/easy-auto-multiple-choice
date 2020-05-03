@@ -13,6 +13,8 @@ use Cwd;
 use Text::CSV qw( csv );; 
 use Unicode::Normalize;
 use File::Copy qw/ copy /;
+use AMC::Data;
+use AMC::DataModule::capture;
 
 ######################
 # localized contants #
@@ -21,8 +23,13 @@ my $defaultTestTXTFileName = "sujet";
 my $testFileName = "sujet";
 my $resultFileName = "resultats.csv";
 my $detailledResultFileName = "resultats_complet.csv";
+my $annotationFile = "annotations.pdf";
+my $annotatedCopiesFile = "copies_corrigées.pdf";
+
 my $resultFileSeparator = ";";
 my $scanDirectoryName = "scans";
+my $markSentence = "Note : ";
+my $scoreSentence = "score : ";
 
 # translations for "name", "firstname" or "group" #
 # must be lower case and without accents #
@@ -80,7 +87,10 @@ my %actionFiles = ( "gui"          => ["test"],
                                        "$amcPrivateDir/data/association.sqlite",
                                        "$amcPrivateDir/exports/$testResultsFileName",
                                        "$resultFileName",
-                                       "$detailledResultFileName"],
+                                       "$detailledResultFileName",
+                                       "$amcPrivateDir/data/report.sqlite",
+                                       "$annotationFile",
+                                       "$annotatedCopiesFile"],
                     "clean"        => [] ); 
 
 
@@ -427,16 +437,19 @@ sub setStudents {
       }
       $studentDisplayName =~ s/ $//;
 
-      # check group #
-      if( exists($student->{group}) ) {
-         if( ! exists($studentGroups{$studentGroup}) ) {
-            $studentGroups{$studentGroup} = "true";
+      # add entry if not only spaces #
+      if( ! ($studentDisplayName =~ /^ *$/) ) {
+      
+         # check group #
+         if( exists($student->{group}) ) {
+            if( ! exists($studentGroups{$studentGroup}) ) {
+               $studentGroups{$studentGroup} = "true";
+            }
          }
-      }
 
-      # write entry #
-      print $inputCSVFileHandle "$currentId,$studentName,$studentGivenName,$studentDisplayName,$studentGroup\n";
-      $currentId++;
+         print $inputCSVFileHandle "$currentId,$studentName,$studentGivenName,$studentDisplayName,$studentGroup\n";
+         $currentId++;
+      }
    }
 
    close($inputCSVFileHandle);
@@ -642,6 +655,9 @@ sub addStudentHeader {
    # previous chars #
    my $texCopy = '\onecopy{1}{';
 
+   # add id
+   $texCopy .= "\n" . '\AMCassociation{\id}' . "\n";
+
    # end string, we need second match #
    $searchString = '\begin{minipage}';
 
@@ -744,9 +760,10 @@ LATEXTITLE
 
 
    # remove brace and add association #
-   $texCopy = substr($texCopy, 0, -1);
-   $texCopy .= "\\AMCassociation\{\\id\}\n\}\n";
-
+   # (now done at copy beginning ) 
+   #$texCopy = substr($texCopy, 0, -1);
+   #$texCopy .= "\\AMCassociation\{\\id\}\n\}\n";
+   $texCopy .= "\n";
 
    #-------------------#
    # read question end #
@@ -834,7 +851,7 @@ sub buildTest {
 
    # build the TEX from the TXT source #
    print("Builing base test tex file...   ");
-   system("auto-multiple-choice prepare --with pdflatex --filter plain --filtered-source $workingPath/$amcPrivateDir/$baseTestTEXFileName --out-sujet $workingPath/$amcPrivateDir/$baseTestPDFFileName --out-corrige $workingPath/$amcPrivateDir/DOC-corrige.pdf --out-corrige-indiv $workingPath/$amcPrivateDir/DOC-indiv-solution.pdf --out-catalog $workingPath/$amcPrivateDir/DOC-catalog.pdf --out-calage $workingPath/$amcPrivateDir/DOC-calage.xy --mode s[sc]k --n-copies \"0\" $testTXTSourceFilePath --prefix $workingPath/$amcPrivateDir/ --latex-stdout --data $workingPath/$amcPrivateDir/data > /dev/null 2>&1");
+   system("auto-multiple-choice prepare --with pdflatex --filter plain --filtered-source '$workingPath/$amcPrivateDir/$baseTestTEXFileName' --out-sujet '$workingPath/$amcPrivateDir/$baseTestPDFFileName' --out-corrige '$workingPath/$amcPrivateDir/DOC-corrige.pdf' --out-corrige-indiv '$workingPath/$amcPrivateDir/DOC-indiv-solution.pdf' --out-catalog '$workingPath/$amcPrivateDir/DOC-catalog.pdf' --out-calage '$workingPath/$amcPrivateDir/DOC-calage.xy' --mode 's[sc]k' --n-copies \"0\" '$testTXTSourceFilePath' --prefix '$workingPath/$amcPrivateDir/' --latex-stdout --data '$workingPath/$amcPrivateDir/data' > /dev/null 2>&1");
    print("Done.\n");
 
    # keep only needed files #
@@ -851,13 +868,13 @@ sub buildTest {
 
    # build test #
    print("Building test...   ");
-   system("auto-multiple-choice prepare --with pdflatex --filter latex --filtered-source $workingPath/$amcPrivateDir/subject_base.tex --out-sujet $workingPath/$amcPrivateDir/DOC-sujet.pdf --out-corrige $workingPath/$amcPrivateDir/DOC-corrige.pdf --out-corrige-indiv $workingPath/$amcPrivateDir/DOC-indiv-solution.pdf --out-catalog $workingPath/$amcPrivateDir/DOC-catalog.pdf --out-calage $workingPath/$amcPrivateDir/DOC-calage.xy --mode s[sc]k --n-copies \"0\" $workingPath/$amcPrivateDir/$testTEXFileName  --prefix $workingPath/$amcPrivateDir/ --latex-stdout --data $workingPath/$amcPrivateDir/data > /dev/null 2>&1");
+   system("auto-multiple-choice prepare --with pdflatex --filter latex --filtered-source '$workingPath/$amcPrivateDir/subject_base.tex' --out-sujet '$workingPath/$amcPrivateDir/DOC-sujet.pdf' --out-corrige '$workingPath/$amcPrivateDir/DOC-corrige.pdf' --out-corrige-indiv '$workingPath/$amcPrivateDir/DOC-indiv-solution.pdf' --out-catalog '$workingPath/$amcPrivateDir/DOC-catalog.pdf' --out-calage '$workingPath/$amcPrivateDir/DOC-calage.xy' --mode 's[sc]k' --n-copies \"0\" '$workingPath/$amcPrivateDir/$testTEXFileName'  --prefix '$workingPath/$amcPrivateDir/' --latex-stdout --data '$workingPath/$amcPrivateDir/data' > /dev/null 2>&1");
    copy("$workingPath/$amcPrivateDir/DOC-sujet.pdf", "$workingPath/${testFileName}.pdf");
    print("Done.\n");
 
    # build layouts #
    print("Building layouts...   ");
-   system("auto-multiple-choice meptex --src $workingPath/$amcPrivateDir/DOC-calage.xy --progression-id MEP --progression 1 --data $workingPath/$amcPrivateDir/data > /dev/null 2>&1");
+   system("auto-multiple-choice meptex --src '$workingPath/$amcPrivateDir/DOC-calage.xy' --progression-id MEP --progression 1 --data '$workingPath/$amcPrivateDir/data' > /dev/null 2>&1");
    print("Done.\n");
 
    # prepare scan directory #
@@ -892,6 +909,94 @@ sub ensureBuildTest {
 # ACTION : read-copies  #
 #########################
 
+sub getScanOrderedStudentsIds {
+
+   # open amc database #
+   my $amcData = AMC::Data->new("$workingPath/$amcPrivateDir/data");
+   my $amcCapture = $amcData->module('capture');
+
+   # scan file <-> student id correspondancy #
+   $amcData->begin_read_transaction('ALST');
+   my @generatedScans = @{$amcCapture->dbh->selectall_arrayref("SELECT src,student FROM " . $amcCapture->table("page"))};
+   $amcData->end_transaction('ALST');
+
+   # get ordered scan list #
+   my @orderedScanFiles;
+   open(my $scanFileListHandle, '<:encoding(UTF-8)', "$workingPath/$amcPrivateDir/$scanFilesListName")
+      or die "Could not open file '$workingPath/$amcPrivateDir/$scanFilesListName' $!";
+
+   while( my $scanFilePath = <$scanFileListHandle> ) {
+      chomp($scanFilePath);
+      my $scanFile = (File::Spec->splitpath($scanFilePath))[2];
+      push @orderedScanFiles, $scanFile;
+   }
+   close($scanFileListHandle);
+   
+   # generate ordered ids #
+   my @scannedStudentCopieIDs;
+   foreach my $scanFile (@orderedScanFiles) {
+
+      # find the correponding id #
+      my @scanFileStudents = grep { "$_->[0]" =~ m/${scanFile}$/ } @generatedScans;
+      if( @scanFileStudents == 1 ) {
+         my $newId = $scanFileStudents[0]->[1];
+   
+         # convert to four digits #
+         my $idLength = 4 - length($newId);
+         my $fourDigitsID = '';
+         while( $idLength != 0 ) {
+            $fourDigitsID .= "0";
+            $idLength--;
+         }
+         $fourDigitsID .= "$newId";
+
+         # add to the list if new #
+         if( ! exists($scannedStudentCopieIDs[-1]) || ($scannedStudentCopieIDs[-1] ne $fourDigitsID) ) {
+            push @scannedStudentCopieIDs, $fourDigitsID;
+         }
+      }
+   }
+
+   return @scannedStudentCopieIDs;
+}
+
+sub annotateScans {
+
+   my $targetPDF = $_[0];
+
+   # clean previous annotations if needed #
+   my @annotationFiles = glob("$workingPath/$amcPrivateDir/cr/corrections/pdf/*");
+   foreach my $annotationFile (@annotationFiles) {
+      unlink("$annotationFile");
+   }
+
+   # annotate from scans #
+   system("auto-multiple-choice annotate --cr '$workingPath/$amcPrivateDir/cr' --project '$workingPath/$amcPrivateDir/' --data '$workingPath/$amcPrivateDir/data' --subject '$workingPath/$amcPrivateDir/DOC-sujet.pdf' --corrected '$workingPath/$amcPrivateDir/DOC-indiv-solution.pdf' --filename-model '' --force-ascii --single-output ''  --sort l --id-file '' --progression-id annotate --progression 1 --line-width 2 --font-name 'Linux Libertine O 12' --symbols '0-0:none/#000000000000,0-1:circle/#ffff00000000,1-0:mark/#ffff00000000,1-1:box/#0000ffff0000' --no-indicatives --position 'marges' --dist-to-box '5.5' --n-digits '4' --verdict '%(ID)\n${markSentence}%s/%m (${scoreSentence}%S/%M)' --verdict-question '%s/%m' --verdict-question-cancelled 'X' --names-file '$workingPath/$amcPrivateDir/$inputCSVFileName' --names-encoding 'UTF-8' --csv-build-name '(name)' '(givenname)' --no-rtl --changes-only 1 --sort l --compose 1 --n-copies 0 --src '$workingPath/$amcPrivateDir/$testTEXFileName' --with pdflatex --filter latex --filtered-source '$workingPath/$amcPrivateDir/$baseTestTEXFileName' --embedded-max-size '1000x1500' --embedded-format jpeg --embedded-jpeg-quality 75 > /dev/null 2>&1");
+
+   # get the scan ordered student list #
+   my @scanOrderedStudentsIds = getScanOrderedStudentsIds();
+
+   # find the corresponding files #
+   my @scanOrderedStudentsAnnotatedFiles;
+   foreach my $studentsId (@scanOrderedStudentsIds) {
+      my @studentAnnotatedFiles = glob("$workingPath/$amcPrivateDir/cr/corrections/pdf/${studentsId}*");
+      if( @studentAnnotatedFiles == 1 ) {
+         push @scanOrderedStudentsAnnotatedFiles, $studentAnnotatedFiles[0];
+      }
+   }
+
+   # generate arg #
+   my $scanFilesListArg = '';
+   foreach my $studentAnnotatedFile (@scanOrderedStudentsAnnotatedFiles) {
+      $scanFilesListArg .= " '$studentAnnotatedFile'";
+   }
+
+   # concat to target files #
+   system("pdftk $scanFilesListArg cat output '$targetPDF'");
+}
+
+
+
 sub readCopies {
 
    #-------#
@@ -919,47 +1024,64 @@ sub readCopies {
    foreach my $scanFile (@scanFiles) {
       print $scanFileListHandle "$scanFile\n";
    }
+   close($scanFileListHandle);
    print("Done.\n");
-
+   
    # copy and prepare scan files #
    print("Preparing scans...   ");
-   system("auto-multiple-choice read-pdfform --progression-id analyse --list $workingPath/$amcPrivateDir/$scanFilesListName --no-multiple --data $workingPath/$amcPrivateDir/data > /dev/null 2>&1");
-   system("auto-multiple-choice getimages --progression-id analyse --list $workingPath/$amcPrivateDir/$scanFilesListName --vector-density 250 --copy-to $workingPath/$amcPrivateDir/scans/ --orientation portrait > /dev/null 2>&1");
+   system("auto-multiple-choice read-pdfform --progression-id analyse --list '$workingPath/$amcPrivateDir/$scanFilesListName' --no-multiple --data '$workingPath/$amcPrivateDir/data' > /dev/null 2>&1");
+   system("auto-multiple-choice getimages --progression-id analyse --list '$workingPath/$amcPrivateDir/$scanFilesListName' --vector-density 250 --copy-to '$workingPath/$amcPrivateDir/scans/' --orientation portrait > /dev/null 2>&1");
    print("Done.\n");
 
    # analyse scans #
    print("Analysing scans...   ");
-   system("auto-multiple-choice analyse --no-multiple --tol-marque 0.2,0.2 --prop 0.8 --bw-threshold 0.6 --progression-id analyse --progression 1 --n-procs \"0\" --data $workingPath/$amcPrivateDir/data --projet $workingPath/$amcPrivateDir/ --cr $workingPath/$amcPrivateDir/cr --liste-fichiers $workingPath/$amcPrivateDir/$scanFilesListName --no-ignore-red --try-three > /dev/null 2>&1");
+   system("auto-multiple-choice analyse --no-multiple --tol-marque '0.2,0.2' --prop 0.8 --bw-threshold 0.6 --progression-id analyse --progression 1 --n-procs \"0\" --data '$workingPath/$amcPrivateDir/data' --projet '$workingPath/$amcPrivateDir/' --cr '$workingPath/$amcPrivateDir/cr' --liste-fichiers '$workingPath/$amcPrivateDir/$scanFilesListName' --no-ignore-red --try-three > /dev/null 2>&1");
    print("Done.\n");
 
    # correct copies #
    print("Correcting copies...   ");
-   system("auto-multiple-choice prepare --out-corrige-indiv $workingPath/$amcPrivateDir/DOC-indiv-solution.pdf --n-copies \"0\" --with pdflatex --filter latex --filtered-source $workingPath/$amcPrivateDir/$baseTestTEXFileName --progression-id bareme --progression 1 --data $workingPath/$amcPrivateDir/data --mode bk $workingPath/$amcPrivateDir/$testTEXFileName > /dev/null 2>&1");
-   system("auto-multiple-choice note --data $workingPath/$amcPrivateDir/data --seuil 0.15 --seuil-up 1 --grain 0.5 --arrondi inf --notemax 20 --plafond --notenull \"0\" --notemin \"\" --postcorrect-student \"\" --postcorrect-copy \"\" --no-postcorrect-set-multiple --progression-id notation --progression 1 > /dev/null 2>&1");
-   print("Done.\n");
-
-   # clean temporary files #
-   print("Cleaning...   ");
-   my @filteredScanFiles = glob("$workingPath/$amcPrivateDir/scans/*");
-   foreach my $filteredScanFile (@filteredScanFiles) {
-      unlink("$filteredScanFile");
-   }
-
-   my @amcCRFiles = glob("$workingPath/$amcPrivateDir/cr/*.jpg");
-   foreach my $amcCRFile (@amcCRFiles) {
-      unlink("$amcCRFile");
-   }
+   system("auto-multiple-choice prepare --out-corrige-indiv '$workingPath/$amcPrivateDir/DOC-indiv-solution.pdf' --n-copies \"0\" --with pdflatex --filter latex --filtered-source '$workingPath/$amcPrivateDir/$baseTestTEXFileName' --progression-id bareme --progression 1 --data '$workingPath/$amcPrivateDir/data' --mode bk '$workingPath/$amcPrivateDir/$testTEXFileName' > /dev/null 2>&1");
+   system("auto-multiple-choice note --data '$workingPath/$amcPrivateDir/data' --seuil 0.15 --seuil-up 1 --grain 0.5 --arrondi inf --notemax 20 --plafond --notenull \"0\" --notemin \"\" --postcorrect-student \"\" --postcorrect-copy \"\" --no-postcorrect-set-multiple --progression-id notation --progression 1 > /dev/null 2>&1");
    print("Done.\n");
 
    # associate students #
    print("Associating students...   ");
-   system("auto-multiple-choice association-auto --data $workingPath/$amcPrivateDir/data --notes-id '<preassoc>' --liste $workingPath/$amcPrivateDir/$inputCSVFileName --liste-key id --csv-build-name '(name)' '(givenname)' --encodage-liste UTF-8 --pre-association > /dev/null 2>&1");
+   system("auto-multiple-choice association-auto --data '$workingPath/$amcPrivateDir/data' --notes-id '<preassoc>' --liste '$workingPath/$amcPrivateDir/$inputCSVFileName' --liste-key id --csv-build-name '(name)' '(givenname)' --encodage-liste UTF-8 --pre-association > /dev/null 2>&1");
    print("Done.\n");
 
    # generate results #
    print("Generating results...   ");
-   system("auto-multiple-choice export --module CSV --data $workingPath/$amcPrivateDir/data --useall  --sort n --fich-noms $workingPath/$amcPrivateDir/$inputCSVFileName --noms-encodage UTF-8 --csv-build-name '(name)' '(givenname)' --no-rtl --output $workingPath/$amcPrivateDir/exports/results.csv --option-out 'encodage=UTF-8' --option-out 'separateur=,' --option-out 'columns=student.copy,student.key,student.name' --option-out 'decimal=,' --option-out 'ticked=' > /dev/null 2>&1");
+   system("auto-multiple-choice export --module CSV --data '$workingPath/$amcPrivateDir/data' --useall  --sort n --fich-noms '$workingPath/$amcPrivateDir/$inputCSVFileName' --noms-encodage UTF-8 --csv-build-name '(name)' '(givenname)' --no-rtl --output '$workingPath/$amcPrivateDir/exports/results.csv' --option-out 'encodage=UTF-8' --option-out 'separateur=,' --option-out 'columns=student.copy,student.key,student.name' --option-out 'decimal=,' --option-out 'ticked=' > /dev/null 2>&1");
    print("Done.\n");
+
+
+   #----------------------#
+   # generate annotations #
+   #----------------------#
+   
+   # create annotated copies #
+   annotateScans("$workingPath/$annotatedCopiesFile");
+
+   # convert all scans to blank #
+   my @generatedScanFiles = glob("$workingPath/$amcPrivateDir/scans/*");
+   foreach my $generatedScanFile (@generatedScanFiles) {
+      system("mogrify -fill white -colorize '100,100,100' '$generatedScanFile'");
+   }
+
+   # create annotation file #
+   annotateScans("$workingPath/$annotationFile");
+
+   # clean temporary files #
+   print("Cleaning...   ");
+   my @temporaryFiles = glob("$workingPath/$amcPrivateDir/scans/*");
+   push @temporaryFiles, glob("$workingPath/$amcPrivateDir/cr/*.jpg");
+   push @temporaryFiles, glob("$workingPath/$amcPrivateDir/cr/corrections/pdf/*"); 
+
+   foreach my $temporaryFile (@temporaryFiles) {
+      unlink("$temporaryFile");
+   }
+   print("Done.\n");
+
 
    #################
    # write results #
