@@ -506,6 +506,17 @@ createAmcBaseDirs($workingPath);
 #########################
 # ACTION : set-students #
 #########################
+
+sub getStudentCSVFiles {
+
+   # search for a csv file witch is not the exam result #
+   my @csvFiles = glob("$workingPath/*.csv");
+   push(@csvFiles, glob("$workingPath/*.CSV"));
+   @csvFiles = grep(!/($resultFileName|$detailledResultFileName)$/, @csvFiles);
+
+   return @csvFiles;
+}
+
 sub setStudents {
 
    #-------#
@@ -513,13 +524,9 @@ sub setStudents {
    #-------#
    cleanActionFiles("$workingPath","set-students");
 
-   # search for a csv file witch is not the exam result #
-   my @csvFiles = glob("$workingPath/*.csv");
-   push(@csvFiles, glob("$workingPath/*.CSV"));
-   @csvFiles = grep(!/($resultFileName|$detailledResultFileName)$/, @csvFiles);
-
-
-   # we need only one file #
+   # we need only one CSV file #
+   my @csvFiles = getStudentCSVFiles();
+    
    if( @csvFiles == 0 ) {
       print("No csv student list file found in the working directory !\n");
       print("Please ensure there is a csv file containing the list of students in :\n");
@@ -1102,7 +1109,37 @@ sub buildTest {
 
    # try to find student list #
    if( ! ensureSetStudents() ) {
-      exit(0);
+
+      # if there is no CSV files, propose to create an example one #
+      my @studentCSVFiles = getStudentCSVFiles();
+      if( @studentCSVFiles == 0 ) {
+         if( askYesOrNo("Would you like the to generate an example student list ?") eq "y" ) {
+
+            # create an example student list #
+            open(my $studentListFileHandle, '>:encoding(UTF-8)', "$workingPath/list.csv")
+               or die "Could not open file '$workingPath/list.csv' $!";
+
+            print $studentListFileHandle <<'CSV_END';
+firstname,lastname
+John,Doe
+Alice,Bell
+Barbara,Chamber
+CSV_END
+
+            close($studentListFileHandle);
+            setStudents();
+         }
+
+         # no example student list, exit # 
+         else {
+            exit(0);
+         }
+      }
+
+      # there is already some CSV files, exit #
+      else {
+         exit(0);
+      }
    }
 
    # try to find the TXT source #
@@ -1157,8 +1194,8 @@ sub ensureBuildTest {
    if( (! -e "$workingPath/$amcPrivateDir/data/layout.sqlite") ||
        (! -e "$workingPath/$amcPrivateDir/data/capture.sqlite") ) {
       print("You need to generate a test before !\n");
-      print("Please create or edit a test source with the \"edit-test\" action\n");
-      print("and build it with the \"build-test\" action\n");
+      print("Please create or edit a test source with the \"edit-test\" action.\n");
+      print("and build it with the \"build-test\" action.\n");
       return;
    }
 
