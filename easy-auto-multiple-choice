@@ -1360,13 +1360,17 @@ sub readCopies {
    #----------------------#
    
    # create annotated copies #
+   print("Generating annotated copies...   ");
    annotateScans("$workingPath/$annotatedCopiesFile");
+   print("Done.\n");
 
    # convert all scans to blank #
+   print("Generating annotations file...   ");
    my @generatedScanFiles = glob("$workingPath/$amcPrivateDir/scans/*");
    foreach my $generatedScanFile (@generatedScanFiles) {
-      system("mogrify -fill white -colorize '100,100,100' '$generatedScanFile'");
+      system("mogrify -fill white -colorize '100,100,100' '$generatedScanFile' > /dev/null 2>&1");
    }
+   print("Done.\n");
 
    # create annotation file #
    annotateScans("$workingPath/$annotationFile");
