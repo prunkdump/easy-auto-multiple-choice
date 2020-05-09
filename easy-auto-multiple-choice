@@ -753,12 +753,15 @@ sub searchOrCreateTXTTest {
    # if no txt file, generate one # 
    elsif( @txtFiles == 0 ) {
 
+      print("No TXT test source, generating default ${defaultTestTXTFileName}.txt...   ");
+
       $testSourceFile = "$workingPath/${defaultTestTXTFileName}.txt";
       open(my $testFileHandle, '>:encoding(UTF-8)', $testSourceFile)
          or die "Could not open file '$testSourceFile' $!";
 
       print $testFileHandle $defaultTestContent;
       close($testFileHandle);
+      print("Done.");
    }
 
    # ok just one txt #
