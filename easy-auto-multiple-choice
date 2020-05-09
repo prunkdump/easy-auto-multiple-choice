@@ -50,6 +50,243 @@ my %studentCSVFieldsNames = ( "name" => "name",
                               "groupe" => "group",
                               "classe" => "group");
 
+my $defaultTestContent = <<'TEST_END';
+# CE FICHIER EST UN EXEMPLE DE SUJET DE QCM. C'EST À PARTIR
+# DE CE FICHIER QU'EST GÉNÉRÉ LE SUJET AU FORMAT PDF A IMPRIMER.
+#
+# Si vous n'avez jamais utilisé "auto-multiple-choice" lisez
+# les indications donnés dans cet exemple pour réaliser votre
+# premier sujet de devoir en modifiant ce fichier.
+#
+# N'HÉSITEZ PAS À CLIQUER RÉGULIÈREMENT SUR "Générer le sujet"
+# POUR VOIR LE SUJET FINAL ET COMPRENDRE LE RÔLE DE CHAQUE LIGNE.
+# (Vous pouvez essayer dès maintenant !)
+#
+# La documentation complète d'auto-multiple-choice se trouve à cette adresse :
+# https://www.auto-multiple-choice.net/auto-multiple-choice.fr/AMC-TXT.shtml
+
+
+# COMMENTAIRES
+#
+# Toutes les lignes qui commence par un "#" ne sont pas prises
+# en compte par le logiciel pour faire le sujet.
+# C'est le cas de beaucoup de lignes de cet exemple qui ne
+# contiennent que des explications.
+
+
+################ 1 ) paramétrage du sujet ######################### 
+
+# LA TAILLE DE PAPIER
+# 
+# En général on laissera cette option à "A4" 
+
+PaperSize: A4
+
+
+# LANGUE DU SUJET
+#
+# Vous pouvez changer la langue si votre sujet n'est pas en
+# français en modifiant l'option "Lang:" ci-dessous.
+# Par exemple mettez : "ES" pour espagnol, "DE" pour allemand
+# ou "IT" pour Italien 
+
+Lang: FR
+
+
+# RECTO-VERSO
+#
+# Si vous ne souhaitez PAS imprimer votre sujet en recto-verso
+# changez le "1" ci-dessous en "0". 
+
+ManualDuplex: 1
+
+
+# MÉLANGE DES QUESTIONS
+#
+# Si vous souhaitez que L'INTÉGRALITÉ des questions du devoir
+# soient mélangées selon les élèves, changez le "0" ci-dessous
+# en "1".
+#
+# Attention cela impose que votre sujet n'ai pas plusieurs
+# parties distinctes puisque tout sera mélangé.
+# Sinon il faut mélanger en utilisant les GROUPES de questions.
+# (voir l'exemple à la fin de ce document).
+#
+
+ShuffleQuestions: 0
+RandomSeed: 58548
+
+
+# FORMULES MATHÉMATIQUES
+#
+# Si vous souhaitez mettre des formules mathématiques dans votre
+# sujet changez le "0" ci-dessous en "1".
+# Ensuite tapez les formules en Latex encadrées de "$".
+
+LaTeX: 0
+
+
+################ 2 ) l'entête du sujet #########################
+
+# TITRE DU SUJET
+#
+# Vous pouvez saisir le titre du devoir après l'option "Title:"
+# ci-dessous. 
+# N'hésitez pas ensuite à cliquer sur "Générer le sujet" pour
+# voir le résultat.  
+
+Title: Mon premier devoir
+
+
+# ÉNONCÉ GENERAL 
+#
+# Après "Présentation:" vous pouvez mettre l'énoncé global du
+# sujet avec par exemple les consignes est la durée de l'épreuve.
+#
+# Vous pouvez aller à la ligne autant de fois que vous voulez.
+# Cela n'ira pas à la ligne dans le sujet.
+#
+# Si vous voulez vraiment aller à la ligne dans le sujet. Il
+# faut laisser une ligne vide comme dans l'exemple ci-dessous.
+# (Cliquez sur "Générer le sujet" et observez les retours à la ligne)
+
+Presentation: Vous avez une heure pour compléter les questions
+suivantes. Pour répondre vous pouvez cocher ou noircir les cases. 
+
+Les questions où plusieurs réponses sont possibles sont signalés
+par un "Trèfle". ATTENTION ! Pour corriger une réponse fausse
+passez l'intégralité de la case au correcteur et ne REDESSINEZ
+PAS LA CASE.
+
+
+################ 3 ) Les questions #########################
+
+# EFFACEZ TOUTES LES QUESTIONS QUI SUIVENT SI VOUS SAVEZ
+# DÉJÀ CRÉER VOS PROPRES QUESTIONS.
+# (vous pouvez par contre garder les commentaires)
+
+
+# QUESTION AVEC UNE SEULE BONNE RÉPONSE
+#
+# Pour créer une question avec une seule bonne réponse il
+# suffit de commencer l'énoncé avec "*".
+# Ensuite on met "+" Pour la bonne réponse et "-" pour les
+# autres.
+
+* Quelle est la capitale du Cameroun ?
++ Yaoundé
+- Douala
+- Kribi
+
+
+# QUESTION AVEC PLUSIEURS RÉPONSES POTENTIELLES
+#
+# Si la question peut avoir aucune, une, ou plusieurs réponses
+# correctes il faut commencer l'énoncé avec "**".
+#
+# Cela ajoute également automatiquement la réponse 
+# "Aucune de ces réponses n’est correcte." 
+
+** Parmi les nombres suivants, lesquels sont positifs ?
++ 2
+- -2
++ 10
+
+
+# RÉPONSES SUR UNE LIGNE
+# 
+# Pour gagner de la place lorsque les réponses sont courtes
+# on peut ajouter "[horiz]" après le "*" ou le "**" pour 
+# mettre les réponses sur une seule ligne.
+
+*[horiz] Quelle est la capitale de la France ?
++ Paris
+- Lille
+- Ouagadougou
+
+
+# ÉNONCÉ À PLUSIEURS LIGNES
+#
+# Il est possible d'écrire un enoncé à plusieurs lignes.
+# Pour cela il faut comprendre qu'un retour à la ligne ici
+# n'a pas d'effet. Par contre DEUX retours à la ligne 
+# (ligne vide) créent un retour à la ligne dans le sujet.
+
+*Vous connaissez sans doute le compositeur 
+Frédéric Chopin. 
+
+De quel pays est-il originaire ?
++ la Pologne
+- le Vénézuela
+- la Suisse
+
+
+################ 4 ) Structurer l'énoncé #########################
+
+# Le logiciel "auto-multiple-choice" a l'avantage de pouvoir mélanger 
+# les questions et les réponses des questions pour éviter la copie.
+#
+# Si on veut mélanger TOUTES les questions du sujet, le plus simple
+# est de mettre l'option "ShuffleQuestions:" à "1".
+# (voir au début de ce document)
+#
+# Si le sujet comporte plusieurs parties et que l'on veut mélanger
+# uniquement les questions à l'intérieur des parties, il faut alors
+# utiliser les GROUPES de questions.
+
+
+# CRÉATION D'UN GROUPE DE QUESTION
+#
+# On démarre un groupe de questions avec "*(" suivit
+# de "[shuffle=true]" pour activer le mélange des questions.
+#
+# Et on termine le groupe avec :
+#
+# *)
+#
+# Si nécessaire, à l'intérieur, en plus des questions, on peut mettre
+# un titre en l'encadrant des symboles "[==" et "==]", et/ou un énoncé
+# pour le groupe.
+# 
+# On donne ci-dessous un exemple complet avec un titre, un énoncé, et
+# trois questions qui seront mélangées selon les copies.
+# (Vérifiez en générant le sujet, et en regardant l'ordre des questions
+# pour trois élèves différents).
+
+*([shuffle=true]
+
+[==Martin Luther King==]
+
+Les questions suivantes concernent Martin Luther King.
+
+* En quelle année est-il né ?
+- 1901
++ 1929
+- 1968
+
+* En quelle année est-il mort ?
+- 1945
+- 1515
++ 1968
+- 1999
+
+* Quelle est sa ville de naissance ?
++ Atlanta
+- Memphis
+- New York
+
+*)
+
+# SUITE DU SUJET
+#
+# Vous pouvez continuer d'ajouter ci-dessous vos questions ou vos groupes
+# de questions.
+
+
+
+
+
+TEST_END
 
 ##################################
 # files generated by each action #
@@ -520,27 +757,7 @@ sub searchOrCreateTXTTest {
       open(my $testFileHandle, '>:encoding(UTF-8)', $testSourceFile)
          or die "Could not open file '$testSourceFile' $!";
 
-      print $testFileHandle <<TESTEND;
-# AMC-TXT source
-PaperSize: A4
-Lang: FR
-Title: Mon premier questionnaire
-
-Presentation: Veuillez répondre aux questions
-ci-dessous du mieux que vous pouvez.
-
-* Quelle est la capitale du Cameroun ?
-+ Yaoundé
-- Douala
-- Kribi
-
-** Parmi les nombres suivants,
-lesquels sont positifs ?
-+ 2
-- -2
-+ 10
-TESTEND
-   
+      print $testFileHandle $defaultTestContent;
       close($testFileHandle);
    }
 
