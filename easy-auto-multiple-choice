@@ -315,9 +315,9 @@ my %actionFiles = ( "gui"          => ["test"],
                                        "$amcPrivateDir/amc-compiled.aux",
                                        "$amcPrivateDir/amc-compiled.amc",
                                        "$amcPrivateDir/amc-compiled.cs",
-                                       "${testFileName}.pdf",
-                                       "$amcPrivateDir/data/capture.sqlite"],
-                    "read-copies"  => ["$amcPrivateDir/$scanFilesListName",
+                                       "${testFileName}.pdf"],
+                    "read-copies"  => ["$amcPrivateDir/data/capture.sqlite",
+                                       "$amcPrivateDir/$scanFilesListName",
                                        "$amcPrivateDir/amc-compiled.xy",
                                        "$amcPrivateDir/amc-compiled.pdf",
                                        "$amcPrivateDir/data/scoring.sqlite",
@@ -1175,6 +1175,9 @@ CSV_END
    system("auto-multiple-choice meptex --src '$workingPath/$amcPrivateDir/DOC-calage.xy' --progression-id MEP --progression 1 --data '$workingPath/$amcPrivateDir/data' > /dev/null 2>&1");
    print("Done.\n");
 
+   # delete the useless generated empty capture database #
+   unlink("$workingPath/$amcPrivateDir/data/capture.sqlite");
+
    # prepare scan directory #
    if( ! -e "$workingPath/$scanDirectoryName" ) {
       mkdir("$workingPath/$scanDirectoryName");
@@ -1191,8 +1194,7 @@ CSV_END
 # ensure the build-test step was done #
 sub ensureBuildTest {
 
-   if( (! -e "$workingPath/$amcPrivateDir/data/layout.sqlite") ||
-       (! -e "$workingPath/$amcPrivateDir/data/capture.sqlite") ) {
+   if( ! -e "$workingPath/$amcPrivateDir/data/layout.sqlite" ) {
       print("You need to generate a test before !\n");
       print("Please create or edit a test source with the \"edit-test\" action.\n");
       print("and build it with the \"build-test\" action.\n");
