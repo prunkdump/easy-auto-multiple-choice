@@ -377,6 +377,32 @@ sub createAmcBaseDirs {
 }
 
 
+sub askYesOrNo {
+
+   # get question from args #
+   if( @_ != 1 ) {
+      return;
+   }
+
+   my $question = $_[0];
+
+   # ask the question #
+   print("$question (y/n): ");
+   while( 1 ) {
+      my $reply = <STDIN>;
+      if( $reply =~ m/^\s*y(es|)\s*$/i ) {
+         return "y";
+      }
+
+      if( $reply =~ m/^\s*n(o|)\s*$/i ) {
+         return "n";
+      }
+
+      print("Please, reply \"y\" or \"n\": ");  
+   }
+}
+
+
 #############
 # error log #
 # for csv   #
@@ -447,8 +473,23 @@ if ( @ARGV !=  2 ) {
 my $workingPath = $ARGV[0];
 $workingPath = Cwd::realpath($workingPath);
 if( ! -d $workingPath ) {
-   print("Cannot find working directory : $workingPath\n");
-   usage();
+
+   # check parent #
+   my $parentDir = (File::Spec->splitpath($workingPath))[1];
+   if( -d $parentDir ) {
+
+      # propose to create dir #
+      if( askYesOrNo("The directory " . "$ARGV[0]" . " does not exist. Would you like to create it ?") eq "y" ) {
+         mkdir($workingPath);
+      } else {
+         exit(0);
+      }
+   }
+
+   else {
+      print("Cannot find working directory : $workingPath\n");
+      usage();
+   }
 }
 
 # check action #
@@ -720,7 +761,7 @@ sub ensureSetStudents {
       print("Put a csv file containing the list of students \n");
       print("in the working directory :\n");
       print("$workingPath\n");
-      print("And launch the \"set-students\" actions\n");
+      print("And launch the \"set-students\" actions.\n");
       return;
    }
 
@@ -761,7 +802,7 @@ sub searchOrCreateTXTTest {
 
       print $testFileHandle $defaultTestContent;
       close($testFileHandle);
-      print("Done.");
+      print("Done.\n");
    }
 
    # ok just one txt #
