@@ -15,6 +15,8 @@ use Unicode::Normalize;
 use File::Copy qw/ copy /;
 use AMC::Data;
 use AMC::DataModule::capture;
+use Gtk3 -init;
+use Encode qw(decode encode);
 
 ######################
 # localized contants #
@@ -452,7 +454,7 @@ sub normalizeString {
 
 sub usage {
    my $binName = (File::Spec->splitpath($0))[2];
-   print("usage : $binName <working_path> <action>\n");
+   print("usage : $binName [working_path] <action>\n");
    print("Possible actions are :\n");
    print("   gui          : launch the GUI\n");
    print("   set-students : read student list from CSV file\n");
@@ -465,42 +467,55 @@ sub usage {
 
 
 # need just two arguments the path and the action #
-if ( @ARGV !=  2 ) {
+# or just "gui" #
+if ( ! (( @ARGV == 1 && $ARGV[0] eq "gui") || (@ARGV == 2)) ) {
    usage();
 }
 
-# check path #
-my $workingPath = $ARGV[0];
-$workingPath = Cwd::realpath($workingPath);
-if( ! -d $workingPath ) {
+# check path if given #
+my $workingPath;
+if( @ARGV == 2 ) {
+   $workingPath = $ARGV[0];
+   $workingPath = Cwd::realpath($workingPath);
+   if( ! -d $workingPath ) {
 
-   # check parent #
-   my $parentDir = (File::Spec->splitpath($workingPath))[1];
-   if( -d $parentDir ) {
+      # check parent #
+      my $parentDir = (File::Spec->splitpath($workingPath))[1];
+      if( -d $parentDir ) {
 
-      # propose to create dir #
-      if( askYesOrNo("The directory " . "$ARGV[0]" . " does not exist. Would you like to create it ?") eq "y" ) {
-         mkdir($workingPath);
-      } else {
-         exit(0);
+         # propose to create dir #
+         if( askYesOrNo("The directory " . "$ARGV[0]" . " does not exist. Would you like to create it ?") eq "y" ) {
+            mkdir($workingPath);
+         } else {
+            exit(0);
+         }
       }
-   }
 
-   else {
-      print("Cannot find working directory : $workingPath\n");
-      usage();
+      else {
+         print("Cannot find working directory : $workingPath\n");
+         usage();
+      }
    }
 }
 
 # check action #
-my $action = $ARGV[1];
+my $action;
+
+if( @ARGV == 1 ) {
+   $action = $ARGV[0];
+} else {
+   $action = $ARGV[1];
+}
+
 if( ! exists($actionFiles{$action}) ) {
    print("Unknown action : $action \n");
    usage();
 }
 
 # init working dir #
-createAmcBaseDirs($workingPath);
+if( $workingPath ) {
+   createAmcBaseDirs($workingPath);
+}
 
 
 #########################
@@ -517,6 +532,10 @@ sub getStudentCSVFiles {
    return @csvFiles;
 }
 
+# return #
+# 'no-file' 
+# 'multiple-file', arrayref
+# 'error', [csv error string] 
 sub setStudents {
 
    #-------#
@@ -531,7 +550,7 @@ sub setStudents {
       print("No csv student list file found in the working directory !\n");
       print("Please ensure there is a csv file containing the list of students in :\n");
       print("$workingPath\n");
-      exit(0);
+      return ('no-file');
    } 
 
    if( @csvFiles > 1 ) {
@@ -540,7 +559,7 @@ sub setStudents {
       foreach my $csvFile (@csvFiles) {
          print("$csvFile\n");
       }
-      exit(0);
+      return ('multiple-files',\@csvFiles);
    }
 
    my $studentsCSVPath = $csvFiles[0];
@@ -604,7 +623,7 @@ sub setStudents {
       else {
          print("Error while parsing student CSV file !\n");
          print("$localErrorMessage\n");
-         exit(0);
+         return ('error', $localErrorMessage);
       }
    }
 
@@ -671,7 +690,7 @@ sub setStudents {
          print("$studentsCSVPath\n");
          print("Please add headers to the CSV file\n");
          print("or keep only one or two fiedls for the student name.\n");
-         exit(0);
+         return ('error');
       }
 
       # there is no header #
@@ -756,7 +775,10 @@ sub setStudents {
 
    # next #
    print("You can now use the \"edit-test\" or \"build-test\" action\n");
-   print("to create a test for these students.\n"); 
+   print("to create a test for these students.\n");
+
+   # return student list #
+   return ('ok', $inputCSVFileName, $currentId, @studentGroupList); 
 }
 
 
@@ -779,14 +801,31 @@ sub ensureSetStudents {
 #######################
 # ACTION : edit-test  #
 #######################
+sub searchTXTtestFiles {
+
+   #  find txt test file #
+   my @txtFiles = glob("$workingPath/*.txt");
+   push(@txtFiles, glob("$workingPath/*.TXT"));
+
+   return @txtFiles;
+}
+
+sub createDefaultTest {
+
+   my $testSourceFile = $_[0];
+   open(my $testFileHandle, '>:encoding(UTF-8)', $testSourceFile)
+       or die "Could not open file '$testSourceFile' $!";
+   
+   print $testFileHandle $defaultTestContent;
+   close($testFileHandle);
+}
 
 sub searchOrCreateTXTTest {
 
    my $testSourceFile;
 
    # try to find a txt file #
-   my @txtFiles = glob("$workingPath/*.txt");
-   push(@txtFiles, glob("$workingPath/*.TXT"));
+   my @txtFiles = searchTXTtestFiles();
 
    # if multiple found, warn #
    if( @txtFiles > 1 ) {
@@ -798,23 +837,17 @@ sub searchOrCreateTXTTest {
       exit(0);
    }
 
-   # if no txt file, generate one # 
+   # if no txt file, generate one #
    elsif( @txtFiles == 0 ) {
-
       print("No TXT test source, generating default ${defaultTestTXTFileName}.txt...   ");
-
       $testSourceFile = "$workingPath/${defaultTestTXTFileName}.txt";
-      open(my $testFileHandle, '>:encoding(UTF-8)', $testSourceFile)
-         or die "Could not open file '$testSourceFile' $!";
-
-      print $testFileHandle $defaultTestContent;
-      close($testFileHandle);
+      createDefaultTest($testSourceFile);
       print("Done.\n");
    }
 
    # ok just one txt #
    else {
-    $testSourceFile = $txtFiles[0];
+      $testSourceFile = $txtFiles[0];
    }
 
    return $testSourceFile;
@@ -1424,13 +1457,615 @@ sub clean {
 ####################
 # Launch : ACTIONS #
 ####################
+my $needGui = "false";
 if( "$action" eq "set-students" ) { setStudents(); }
 elsif( "$action" eq "edit-test" ) { editTest(); }
 elsif( "$action" eq "build-test" ) { buildTest(); }
 elsif( "$action" eq "read-copies" ) { readCopies(); }
 elsif( "$action" eq "clean" ) { clean(); }
-elsif( "$action" eq "gui" ) { print("Launch Gui\n"); }
-else {
-   print("Unknown action : $action \n");
-   usage();
+else { $needGui = "true"; }
+
+# if the action is "gui" #
+# continue #
+if( $needGui ne "true" ) {
+   exit(0);
 }
+
+
+
+
+
+
+#############################################
+#############################################
+#                                           #
+#                GUI CODE                   #
+#                                           #
+#############################################
+#############################################
+
+# main gui variables #
+my $mainWindow;
+my %guiState;
+
+
+###########
+# signals #
+###########
+
+sub checkStudents {
+
+   # check if workingPath is set #
+   if( ! $workingPath ) {
+      return;
+   }
+
+   # run set students #
+   my @result = setStudents();
+
+   # check result #
+   if( $result[0] eq 'no-file' ) {
+
+      # no CSV files #
+      delete $guiState{'students'}{'path'};
+      $guiState{'students'}{'stack'}->set_visible_child_name('not-set');
+   }
+
+   elsif( $result[0] eq 'multiple-files' ) {
+
+      # multiple CSV #
+      delete $guiState{'students'}{'path'};
+      $guiState{'students'}{'stack'}->set_visible_child_name('error');
+      #!!!
+      # need to be added to the stack
+
+   }
+
+   else {
+
+      # csv file found #
+      my $studentCount = $result[2];
+      $guiState{'students'}{'path'} = $result[1];
+      $guiState{'students'}{'label'}->set_markup("<span foreground=\"green\">$studentCount élèves seront évalués</span>");
+      $guiState{'students'}{'stack'}->set_visible_child_name('set');
+      $guiState{'steps-done'}{'set-students'} = "true";
+   }
+}
+
+
+sub checkTest {
+
+   # check if workingPath is set #
+   if( ! $workingPath ) {
+      return;
+   }
+
+   # get txt files #
+   my @txtFiles = searchTXTtestFiles();
+
+   # check the result #
+   if( @txtFiles == 0 ) {
+
+      # no txt test file #
+      delete $guiState{'test'}{'path'};
+      $guiState{'test'}{'stack'}->set_visible_child_name('not-set');
+   }
+
+   elsif( @txtFiles == 1 ) {
+
+      # ok : just one file #
+      $guiState{'test'}{'path'} = $txtFiles[0];
+      my $testFileName = (File::Spec->splitpath($txtFiles[0]))[2];
+      $guiState{'test'}{'label'}->set_markup("<span foreground=\"green\">$testFileName</span>");
+      $guiState{'test'}{'stack'}->set_visible_child_name('set');
+   }
+
+   else {
+
+      # multiple files #
+      delete $guiState{'test'}{'path'};
+      $guiState{'test'}{'stack'}->set_visible_child_name('error');
+   }
+}
+
+
+sub checkProjectDirectory {
+
+   # check if workingPath is set #
+   if( ! $workingPath ) {
+      return;
+   }
+
+   createAmcBaseDirs($workingPath);
+   checkStudents();
+   checkTest();
+}
+
+sub setProjectDirectory {
+
+   my $filename = $_[0];
+
+   # save value #
+   $guiState{'project'}{'path'} = $filename;
+
+   # set label #
+   $guiState{'project'}{'label'}->set_text($filename);
+   $guiState{'project'}{'label'}->set_position(-1);
+
+   # set stack #
+   $guiState{'project'}{'stack'}->set_visible_child_name('set');
+
+   # change working directory #
+   $workingPath = $filename;
+   checkProjectDirectory();
+}   
+ 
+
+sub chooseProjectDirectory {
+
+   # create a directory chooser dialog #
+   my $directoryChooser = Gtk3::FileChooserDialog->new("Dossier de projet",
+                                                       $mainWindow,
+                                                       'select-folder',
+                                                       "Choisir",
+                                                       'accept',
+                                                       "Annuler",
+                                                       'cancel');
+
+
+
+   # check result #
+   my $response = $directoryChooser->run();
+   if( $response eq 'accept' ) {
+
+      # get filename #
+      my $filename = decode('UTF-8', $directoryChooser->get_filename());
+      setProjectDirectory($filename);
+  
+   }
+   $directoryChooser->destroy();
+}
+
+
+sub launchEditTest {
+
+   if( ! defined($guiState{'test'}{'path'}) ) {
+      return;
+   }
+
+   # launch edit-test #
+   system("$0 '$workingPath' 'edit-test'");
+}
+
+
+
+############################
+# main window : mainWindow #
+############################
+
+# create main window #
+$mainWindow = Gtk3::Window->new('toplevel');
+$mainWindow->set_border_width(15);
+{
+
+   # main parts box : mainPartsBox #
+   my $mainPartsBox = Gtk3::Box->new('vertical', 5);
+   $mainPartsBox->set_homogeneous(0); 
+   $mainWindow->add($mainPartsBox);
+   {
+      
+      # project folder frame : projectFolderFrame #
+      my $projectFolderFrame = Gtk3::Frame->new("Dossier du projet");
+      $mainPartsBox->pack_start($projectFolderFrame, 1, 1, 0);
+      {
+
+         # stack : stack #
+         my $stack = Gtk3::Stack->new();
+         $stack->set_border_width(10);
+         $projectFolderFrame->add($stack);
+         $guiState{'project'}{'stack'} = $stack;
+         {
+
+            # not set case box : notSetBox #
+            my $notSetBox = Gtk3::Box->new('vertical', 10);
+            $stack->add_named($notSetBox, 'not-set');
+            {
+
+               # first line box : flBox #
+               my $flBox = Gtk3::Box->new('horizontal', 5);
+               $notSetBox->pack_start($flBox, 0, 0, 0);
+               {
+
+                  # text #
+                  my $text = Gtk3::Label->new();
+                  $text->set_markup('<span foreground="red">Veuillez choisir un dossier pour le projet.</span>');
+                  $flBox->pack_start($text, 0, 0, 0);
+               }
+
+               # second line box : slBox #
+               my $slBox = Gtk3::Box->new('horizontal', 5);
+               $notSetBox->pack_start($slBox, 0, 0, 0);
+               {
+
+                  # browse button : button #
+                  my $button = Gtk3::Button->new("Parcourir");
+                  $button->signal_connect('clicked', \&chooseProjectDirectory);
+                  $slBox->pack_start($button, 0, 0, 0);
+               }
+            }
+
+            # set case box : setBox #
+            my $setBox = Gtk3::Box->new('vertical', 10);
+            $stack->add_named($setBox, 'set');
+            {
+
+               # first line box : flBox #
+               my $flBox = Gtk3::Box->new('horizontal', 5);
+               $setBox->pack_start($flBox, 0, 0, 0);
+               {
+                  # project directory text : projectDirectoryText #
+                  my $projectDirectoryText = Gtk3::Entry->new();
+                  $projectDirectoryText->set_editable(0);
+                  $projectDirectoryText->set_position(-1);
+                  $projectDirectoryText->set_sensitive(0);
+                  $flBox->pack_start($projectDirectoryText, 1, 1, 0);
+                  $guiState{'project'}{'label'} = $projectDirectoryText;
+               }
+
+               # buttons box : buttonsBox #
+               my $buttonsBox = Gtk3::Box->new('horizontal', 5);
+               $setBox->pack_start($buttonsBox, 0, 0, 0);
+               {
+
+                  # change button : changeButton #
+                  my $changeButton = Gtk3::Button->new("Changer");
+                  $changeButton->signal_connect('clicked', \&chooseProjectDirectory);
+                  $buttonsBox->pack_start($changeButton, 1, 0, 0);
+
+                  # actualize button : actualizeButton #
+                  my $actualizeButton = Gtk3::Button->new("Actualiser");
+                  $actualizeButton->signal_connect('clicked', \&checkProjectDirectory);
+                  $buttonsBox->pack_start($actualizeButton, 1, 0, 0);
+
+                  # copy button : copyButton #
+                  my $copyButton = Gtk3::Button->new("Copier vers");
+                  $buttonsBox->pack_start($copyButton, 1, 0, 0);
+               }
+            }
+         }
+      }
+
+      # source folder frame : sourceFolderFrame #
+      my $sourceFolderFrame = Gtk3::Frame->new("Fichiers sources");
+      $mainPartsBox->pack_start($sourceFolderFrame, 1, 1, 0);
+      {
+
+         # sources hbox : sourcesBox #
+         my $sourcesBox = Gtk3::Box->new('vertical', 5);
+         $sourcesBox->set_border_width(5);
+         $sourceFolderFrame->add($sourcesBox);
+         {
+
+            # student stack : studentStack #
+            my $studentStack = Gtk3::Stack->new();
+            $studentStack->set_border_width(10);
+            $sourcesBox->pack_start($studentStack, 0, 0, 0);
+            $guiState{'students'}{'stack'} = $studentStack;
+            {
+
+               # student not set case box : notSetBox #
+               my $notSetBox = Gtk3::Box->new('vertical', 5);
+               $studentStack->add_named($notSetBox, 'not-set');
+                {
+
+                  # first line box : flBox #
+                  my $flBox = Gtk3::Box->new('horizontal', 5);
+                  $notSetBox->pack_start($flBox, 0, 0, 0);
+                  {
+
+                     # no student list text #
+                     my $text = Gtk3::Label->new();
+                     $text->set_markup("<span foreground=\"red\">Pas de liste CSV d'élèves dans le dossier du projet !</span>");
+                     $text->set_line_wrap(1);
+                     $flBox->pack_start($text, 0, 0, 0);
+                  }
+
+                  # set CSV box : setCSVBox #
+                  my $setCSVBox = Gtk3::Box->new('horizontal', 5);
+                  $notSetBox->pack_start($setCSVBox, 0, 0, 0);
+                  {
+
+                     # text #
+                     my $text = Gtk3::Label->new("Veuillez corriger et actualiser ou ");
+                     $setCSVBox->pack_start($text, 0, 0, 0);
+                        
+                     # button #
+                     my $button = Gtk3::Button->new("Choisir la liste");
+                     $setCSVBox->pack_start($button, 0, 0, 0);
+                  }
+               }
+
+
+               # student set box : studentSetBox #
+               my $studentSetBox =  Gtk3::Box->new('vertical', 5);
+               $studentStack->add_named($studentSetBox, 'set');
+               {
+
+                  # first line box : flBox #
+                  my $flBox = Gtk3::Box->new('horizontal', 5);
+                  $studentSetBox->pack_start($flBox, 0, 0, 0);
+                  {
+
+                     # eleve number text : eleveNumberText #
+                     my $eleveNumberText = Gtk3::Label->new();
+                     $flBox->pack_start($eleveNumberText, 0, 0, 0);
+                     $guiState{'students'}{'label'} = $eleveNumberText;
+                  }
+
+                  # second line box : slBox #
+                  my $slBox = Gtk3::Box->new('horizontal', 5);
+                  $studentSetBox->pack_start($slBox, 0, 0, 0);
+                  {
+
+                     # change student list button : changeStudentsButton #
+                     my $changeStudentsButton = Gtk3::Button->new('Changer la liste CSV des élèves');
+                     $slBox->pack_start($changeStudentsButton, 0, 0, 0);
+                  } 
+               }
+            }
+
+            # test stack : testStack #
+            my $testStack = Gtk3::Stack->new();
+            $testStack->set_border_width(10);
+            $sourcesBox->pack_start($testStack, 0, 0, 0);
+            $guiState{'test'}{'stack'} = $testStack;
+            {
+
+               # test not set box : notSetBox #
+               my $notSetBox = Gtk3::Box->new('vertical', 5);
+               $testStack->add_named($notSetBox, 'not-set');
+               {
+
+                  # first line box : flBox #
+                  my $flBox = Gtk3::Box->new('horizontal', 5);
+                  $notSetBox->pack_start($flBox, 0, 0, 0);
+                  {
+
+                     # no test text : notestText #
+                     my $notestText = Gtk3::Label->new();
+                     $notestText->set_markup('<span foreground="red">Pas de sujet TXT dans le dossier du projet !</span>');
+                     $notestText->set_line_wrap(1);
+                     $flBox->pack_start($notestText, 0, 0, 0);
+                  }
+
+                  # set test box : setTestBox #
+                  my $setTestBox = Gtk3::Box->new('horizontal', 5);
+                  $notSetBox->pack_start($setTestBox, 0, 0, 0);
+                  {
+
+                     # text #
+                     my $text = Gtk3::Label->new("Veuillez corriger et actualiser ou ");
+                     $setTestBox->pack_start($text, 0, 0, 0);
+
+                     # button #
+                     my $button = Gtk3::Button->new("Choisir le sujet");
+                     $setTestBox->pack_start($button, 0, 0, 0);
+                  }
+               }
+
+
+               # test set box : setBox #
+               my $setBox = Gtk3::Box->new('vertical', 5);
+               $testStack->add_named($setBox, 'set');
+               {
+
+                  # first line box : flBox #
+                  my $flBox = Gtk3::Box->new('horizontal', 5);
+                  $setBox->pack_start($flBox, 0, 0, 0);
+                  {
+
+                     # file name test : filenameText #
+                     my $filenameText = Gtk3::Label->new();
+                     $flBox->pack_start($filenameText, 0, 0, 0);
+                     $guiState{'test'}{'label'} = $filenameText;
+                  }
+
+                  # second line box : slBox #
+                  my $slBox = Gtk3::Box->new('horizontal', 5);
+                  $setBox->pack_start($slBox, 0, 0, 0);
+                  {
+
+                     # changeButton : changeButton #
+                     my $changeButton = Gtk3::Button->new("Changer");
+                     $slBox->pack_start($changeButton, 0, 0, 0);
+                  }
+               }
+            }
+         }
+      }
+
+      # steps frame : stepsFrame #
+      my $stepsFrame = Gtk3::Frame->new("Etapes");
+      $mainPartsBox->pack_start($stepsFrame, 1, 1, 0);
+      {
+
+         # steps box : stepsBox #
+         my $stepsBox = Gtk3::Box->new('vertical', 5);
+         $stepsBox->set_border_width(10);
+         $stepsFrame->add($stepsBox);
+         {
+
+            # first line box : flBox #
+            my $flBox = Gtk3::Box->new('horizontal', 5);
+            $stepsBox->pack_start($flBox, 0, 0, 0);
+            {
+
+               # first step button : firstStepButton #
+               my $firstStepButton =  Gtk3::Button->new("1) Editer le sujet");
+               $firstStepButton->signal_connect('clicked', \&launchEditTest);
+               $flBox->pack_start($firstStepButton, 0, 0, 0);
+            }
+
+            # second line box : slBox #
+            my $slBox = Gtk3::Box->new('horizontal', 5);
+            $stepsBox->pack_start($slBox, 0, 0, 0);
+            {
+
+               # second step button : secondStepButton #
+               my $secondStepButton =  Gtk3::Button->new("2) Générer le sujet");
+               $slBox->pack_start($secondStepButton, 0, 0, 0);
+            }
+
+            # third line box : tlBox #
+            my $tlBox = Gtk3::Box->new('horizontal', 5);
+            $stepsBox->pack_start($tlBox, 0, 0, 0);
+            {
+
+               # third step text : tsText #
+               my $tsText =  Gtk3::Label->new("Mettre les copies dans le dossier \"scans\" du projet puis :");
+               $tsText->set_line_wrap(1);
+               $tlBox->pack_start($tsText, 0, 0, 0);
+            }
+
+            # fourth line box : fourthLineBox #
+            my $fourthLineBox = Gtk3::Box->new('horizontal', 5);
+            $stepsBox->pack_start($fourthLineBox, 0, 0, 0);
+            {
+
+               # fourth step button : fourthStepButton #
+               my $fourthStepButton =  Gtk3::Button->new("3) Corriger les copies");
+               $fourthLineBox->pack_start($fourthStepButton, 0, 0, 0);
+            }
+         }
+      }
+
+      # files frame : filesFrame #
+      my $filesFrame = Gtk3::Frame->new("Fichiers du projet");
+      $mainPartsBox->pack_start($filesFrame, 1, 1, 0);
+      {
+
+         # files box : filesBox #
+         my $filesBox = Gtk3::Box->new('vertical', 5);
+         $filesBox->set_border_width(10);
+         $filesFrame->add($filesBox);
+         {
+
+            # first line box : flBox #
+            my $flBox = Gtk3::Box->new('horizontal', 5);
+            $filesBox->pack_start($flBox, 0, 0, 0);
+            {
+
+               # label : text #
+               my $text = Gtk3::Label->new("Sujet à imprimer : ");
+               $flBox->pack_start($text, 0, 0, 0);
+
+               # test file stack : testStack #
+               my $testStack = Gtk3::Stack->new();
+               $flBox->pack_start($testStack, 0, 0, 0);
+               {
+
+                  # not set text : notSetText #
+                  my $notSetText = Gtk3::Label->new("Aucun");
+                  $testStack->add_named($notSetText, "not-set");
+
+                  # set button : setButton #
+                  my $setButton = Gtk3::Button->new("Ouvrir");
+                  $testStack->add_named($setButton, "set");
+               }
+            }  
+
+            # second line box : slBox #
+            my $slBox = Gtk3::Box->new('horizontal', 5);
+            $filesBox->pack_start($slBox, 0, 0, 0);
+            {
+
+               # label : text #
+               my $text = Gtk3::Label->new("Résultats : ");
+               $slBox->pack_start($text, 0, 0, 0);
+
+               # result file stack : resultStack #
+               my $resultStack = Gtk3::Stack->new();
+               $slBox->pack_start($resultStack, 0, 0, 0);
+               {
+
+                  # not set text : notSetText #
+                  my $notSetText = Gtk3::Label->new("Aucun");
+                  $resultStack->add_named($notSetText, "not-set");
+
+                  # set button : setButton #
+                  my $setButton = Gtk3::Button->new("Ouvrir");
+                  $resultStack->add_named($setButton, "set");
+               }
+            }  
+
+            # third line box : tlBox #
+            my $tlBox = Gtk3::Box->new('horizontal', 5);
+            $filesBox->pack_start($tlBox, 0, 0, 0);
+            {
+
+               # label : text #
+               my $text = Gtk3::Label->new("Copies corrigées : ");
+               $tlBox->pack_start($text, 0, 0, 0);
+
+               # annotation file stack : annotationStack #
+               my $annotationStack = Gtk3::Stack->new();
+               $tlBox->pack_start($annotationStack, 0, 0, 0);
+               {
+
+                  # not set text : notSetText #
+                  my $notSetText = Gtk3::Label->new("Aucun");
+                  $annotationStack->add_named($notSetText, "not-set");
+
+                  # set button : setButton #
+                  my $setButton = Gtk3::Button->new("Ouvrir");
+                  $annotationStack->add_named($setButton, "set");
+               }
+            }  
+
+
+            # fourth line box : fhlBox #
+            my $fhlBox = Gtk3::Box->new('horizontal', 5);
+            $filesBox->pack_start($fhlBox, 0, 0, 0);
+            {
+
+               # label : text #
+               my $text = Gtk3::Label->new("Annotations : ");
+               $fhlBox->pack_start($text, 0, 0, 0);
+
+               # annotation only file stack : annotationOnlyStack #
+               my $annotationOnlyStack = Gtk3::Stack->new();
+               $fhlBox->pack_start($annotationOnlyStack, 0, 0, 0);
+               {
+
+                  # not set text : notSetText #
+                  my $notSetText = Gtk3::Label->new("Aucun");
+                  $annotationOnlyStack->add_named($notSetText, "not-set");
+
+                  # set button : setButton #
+                  my $setButton = Gtk3::Button->new("Ouvrir");
+                  $annotationOnlyStack->add_named($setButton, "set");
+               }
+            }  
+         }
+      }
+   }
+}
+
+
+$mainWindow->signal_connect('delete-event' => sub { Gtk3::main_quit });
+$mainWindow->show_all;
+
+
+
+##############
+# launch gui #
+##############
+
+# check working dir from command line #
+if( $workingPath ) {
+   setProjectDirectory($workingPath);
+}
+
+# run main loop #
+Gtk3::main;
+
