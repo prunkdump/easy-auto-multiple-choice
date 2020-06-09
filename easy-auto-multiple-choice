@@ -1539,6 +1539,49 @@ my $mainWindow;
 my %guiState;
 my $guiConfFile = "$homePath/.easy-auto-multiple-choice";
 
+######################################################################
+# guiState variable #
+#####################
+#
+# 'window' : the main window
+# 'control': the box containing all gui controls
+# 'project-control' : the box containing project controls
+# 'files-control': the box containing files controls (students/test)
+# 'files-combo': the file combo at bottom of the gui
+#
+# 'project'
+# -> 'stack' : the gui stack of the project folder "not-set"/"set"
+# -> 'label' : the displayed project file path label when set
+# -> 'path'  : set if a project path was given
+#
+# 'students'
+# -> 'stack' : the gui stack of the student CSV list "not-set"/"set"/"error"
+# -> 'label' : the displayed students CSV file name label
+# -> 'path'  : set if a student CSV file is associated to the project
+# -> 'error-label' : the error label displayed
+#
+# 'test'
+# -> 'stack' : the gui stack of the test source "not-set"/"set"/"error"
+# -> 'label' : the displayed test source file name label
+# -> 'path'  : set if a test source is associated to the project
+# -> 'error-label' : the error label displayed
+#
+# 'steps-done'
+# -> 'set-students' : "true" if the set-students step was done, undef otherwise
+# -> 'build-test'   : "true" if the build-test step was done, undef otherwise
+# -> 'read-copies'  : "true" if the steps-done step was done, undef otherwise
+#
+# 'command'
+# -> 'pid'          : the pid of the current launched command
+# -> 'fh'           : the file handle on the current launched command
+# -> 'watch-tag'    : the tag of the command watcher
+# -> 'stack'        : the gui stack of the running command "not-set"/"set"
+# -> 'progress-bar' : the gui command progress bar
+# -> 'total-pulses' : the number of pulses needed to finish the command
+# -> 'pulse-count'  : the current number of pulses
+#
+######################################################################
+
 
 # the project generated files combo #
 my %guiStepFiles = (
@@ -1554,7 +1597,7 @@ my %guiStepFiles = (
 sub filesComboAddStep {
 
    my ($stepName) = $_[0];
-   my $combo = $guiState{'filesCombo'};
+   my $combo = $guiState{'files-combo'};
    
    foreach my $stepFile ( @{$guiStepFiles{"$stepName"}} ) {
       $combo->append_text($stepFile->{'name'});
@@ -1563,7 +1606,7 @@ sub filesComboAddStep {
       
 sub updateFilesCombo {
 
-   my $combo = $guiState{'filesCombo'};
+   my $combo = $guiState{'files-combo'};
 
    # empty #
    $combo->remove_all();
@@ -1575,7 +1618,7 @@ sub updateFilesCombo {
       # no files #
       $combo->append_text("Aucun");
       $combo->set_active(0);
-      $guiState{'filesControl'}->set_sensitive(0);
+      $guiState{'files-control'}->set_sensitive(0);
    }
 
    else {
@@ -1590,7 +1633,7 @@ sub updateFilesCombo {
       }
 
       $combo->set_active(0);
-      $guiState{'filesControl'}->set_sensitive(1);
+      $guiState{'files-control'}->set_sensitive(1);
    }
 }
 
@@ -1636,9 +1679,20 @@ sub checkStudents {
       # multiple CSV #
       delete $guiState{'students'}{'path'};
       delete $guiState{'steps-done'}{'set-students'};
+      $guiState{'students'}{'error-label'}->set_markup("<span foreground=\"red\">Erreur ! Plusieurs listes d'élèves CSV sont présentes dans le dossier du projet. Veuillez en garder une seule et actualisez.</span>");
       $guiState{'students'}{'stack'}->set_visible_child_name('error');
-      #!!!
-      # need to be added to the stack
+   }
+
+   elsif ( $result[0] eq 'error' ) {
+
+      delete $guiState{'students'}{'path'};
+      delete $guiState{'steps-done'}{'set-students'};
+      if( defined($result[1]) ) {
+	 $guiState{'students'}{'label'}->set_markup("<span foreground=\"red\">Erreur ! $result[1]</span>");
+      } else {
+	 $guiState{'students'}{'label'}->set_markup("<span foreground=\"red\">Une erreur s'est produite lors de la lecture de la liste CSV des élèves. Veuillez vérifier cette liste et actualisez.</span>");
+      }
+      $guiState{'students'}{'stack'}->set_visible_child_name('not-set');
    }
 
    else {
@@ -1692,6 +1746,8 @@ sub checkTest {
  
 	 # set step #
 	 $guiState{'steps-done'}{'build-test'} = 'true';
+      } else {
+	 delete $guiState{'steps-done'}{'build-test'};
       }
    }
 
@@ -1699,9 +1755,9 @@ sub checkTest {
 
       # multiple files #
       delete $guiState{'test'}{'path'};
+      delete $guiState{'steps-done'}{'build-test'};
+      $guiState{'test'}{'error-label'}->set_markup("<span foreground=\"red\">Erreur ! Plusieurs sujets TXT sont présents dans le dossier du projet. Veuillez en garder un seul et actualisez.</span>");
       $guiState{'test'}{'stack'}->set_visible_child_name('error');
-      #!!!
-      # need to be added to the stack
    }
 }
 
@@ -2168,7 +2224,7 @@ sub getCommandOutput {
    if( eof( $fh ) ) {
 
       # remove watch #
-      Glib::Source->remove( $guiState{'command'}{'watchTag'} );
+      Glib::Source->remove( $guiState{'command'}{'watch-tag'} );
 
       # close command #
       close($fh);
@@ -2188,8 +2244,8 @@ sub getCommandOutput {
 
       # check pulse #
       if( $line =~ m/Done\./ ) {
-	 $guiState{'command'}{'pulseCount'}++;
-	 $guiState{'command'}{'progressBar'}->set_fraction( $guiState{'command'}{'pulseCount'}/$guiState{'command'}{'totalPulses'} );
+	 $guiState{'command'}{'pulse-count'}++;
+	 $guiState{'command'}{'progress-bar'}->set_fraction( $guiState{'command'}{'pulse-count'}/$guiState{'command'}{'total-pulses'} );
       }
    }
    
@@ -2204,8 +2260,8 @@ sub launchCommand {
    my $fh;
    my $pid;
    $pid = open($fh, "-|", "$0 '$workingPath' '$action'");
-   $guiState{'command'}{'totalPulses'} = $totalPulses;
-   $guiState{'command'}{'pulseCount'} = 1;
+   $guiState{'command'}{'total-pulses'} = $totalPulses;
+   $guiState{'command'}{'pulse-count'} = 1;
 
    # add watchers #
    my $watchTag = Glib::IO->add_watch(fileno($fh), ['in','hup'], \&getCommandOutput );
@@ -2213,14 +2269,14 @@ sub launchCommand {
    # save #
    $guiState{'command'}{'pid'} = $pid;
    $guiState{'command'}{'fh'} = $fh;
-   $guiState{'command'}{'watchTag'} = $watchTag;
+   $guiState{'command'}{'watch-tag'} = $watchTag;
 
    # set gui insensitive #
    $guiState{'control'}->set_sensitive(0);
    
    # start progress bar #
    $guiState{'command'}{'stack'}->set_visible_child_name('set');
-   $guiState{'command'}{'progressBar'}->set_fraction( $guiState{'command'}{'pulseCount'}/$guiState{'command'}{'totalPulses'} );
+   $guiState{'command'}{'progress-bar'}->set_fraction( $guiState{'command'}{'pulse-count'}/$guiState{'command'}{'total-pulses'} );
 }
    
 sub launchBuildTest {
@@ -2298,7 +2354,7 @@ sub launchReadCopies {
 sub openComboFile {
 
    # get selected file #
-   my $combo = $guiState{'filesCombo'};
+   my $combo = $guiState{'files-combo'};
    my $selectedFileName = $combo->get_active_text();
 
    # search path in steps files #
@@ -2475,8 +2531,8 @@ $guiState{'window'} = $mainWindow;
 			   $setCSVBox->pack_start($button, 0, 0, 0);
 			}
 		     }
-		     
-		     
+
+
 		     # student set box : studentSetBox #
 		     my $studentSetBox =  Gtk3::Box->new('vertical', 5);
 		     $studentStack->add_named($studentSetBox, 'set');
@@ -2487,10 +2543,10 @@ $guiState{'window'} = $mainWindow;
 			$studentSetBox->pack_start($flBox, 0, 0, 0);
 			{
 			   
-			   # eleve number text : eleveNumberText #
-			   my $eleveNumberText = Gtk3::Label->new();
-			   $flBox->pack_start($eleveNumberText, 0, 0, 0);
-			   $guiState{'students'}{'label'} = $eleveNumberText;
+			   # student number text label #
+			   my $studentLabel = Gtk3::Label->new();
+			   $guiState{'students'}{'label'} = $studentLabel;
+			   $flBox->pack_start($studentLabel, 0, 0, 0);
 			}
 			
 			# second line box : slBox #
@@ -2503,6 +2559,24 @@ $guiState{'window'} = $mainWindow;
 			   $changeStudentsButton->signal_connect('clicked', \&chooseStudentList);
 			   $slBox->pack_start($changeStudentsButton, 0, 0, 0);
 			} 
+		     }
+
+		     # student error box : studentErrorBox #
+		     my $studentErrorBox =  Gtk3::Box->new('vertical', 5);
+		     $studentStack->add_named($studentErrorBox, 'error');
+		     {
+			
+			# first line box : flBox #
+			my $flBox = Gtk3::Box->new('horizontal', 5);
+			$studentErrorBox->pack_start($flBox, 0, 0, 0);
+			{
+
+			   # error label #
+			   my $errorLabel = Gtk3::Label->new();
+			   $errorLabel->set_line_wrap(1);
+			   $guiState{'students'}{'error-label'} = $errorLabel;
+			   $flBox->pack_start($errorLabel, 0, 0, 0);
+			}
 		     }
 		  }
 		  
@@ -2571,6 +2645,24 @@ $guiState{'window'} = $mainWindow;
 			   my $changeButton = Gtk3::Button->new("Changer");
 			   $changeButton->signal_connect('clicked', \&chooseTestSource);
 			   $slBox->pack_start($changeButton, 0, 0, 0);
+			}
+		     }
+
+		     # test error box : testErrorBox #
+		     my $testErrorBox = Gtk3::Box->new('vertical', 5);
+		     $testStack->add_named($testErrorBox, 'error');
+		     {
+			
+			# first line box : flBox #
+			my $flBox = Gtk3::Box->new('horizontal', 0);
+			$testErrorBox->pack_start($flBox, 0, 0, 0);
+			{
+
+			   # error label #
+			   my $errorLabel = Gtk3::Label->new();
+			   $errorLabel->set_line_wrap(1);
+			   $guiState{'test'}{'error-label'} = $errorLabel;
+			   $flBox->pack_start($errorLabel, 0, 0, 0);
 			}
 		     }
 		  }
@@ -2643,12 +2735,12 @@ $guiState{'window'} = $mainWindow;
 	       my $filesBox = Gtk3::Box->new('horizontal', 5);
 	       $filesBox->set_border_width(10);
 	       $filesFrame->add($filesBox);
-	       $guiState{'filesControl'} = $filesBox;
+	       $guiState{'files-control'} = $filesBox;
 	       {
 
 		  # files combo box : combo #
 		  my $combo = Gtk3::ComboBoxText->new();
-		  $guiState{'filesCombo'} = $combo;
+		  $guiState{'files-combo'} = $combo;
 		  $combo->append_text("Aucun");
 		  $combo->set_active(0);
 		  $filesBox->pack_start($combo, 0, 0, 0);
@@ -2674,11 +2766,11 @@ $guiState{'window'} = $mainWindow;
 	 my $text = Gtk3::Label->new("Prêt.");
 	 $commandStack->add_named($text, "not-set");
 
-	 # command progress bar : progressBar #
+	 # command progress bar : progressBar
 	 my $progressBar = Gtk3::ProgressBar->new();
 	 $progressBar->set_show_text(1); 
 	 $commandStack->add_named($progressBar, "set");
-	 $guiState{'command'}{'progressBar'} = $progressBar;
+	 $guiState{'command'}{'progress-bar'} = $progressBar;
       }
    }
 }
