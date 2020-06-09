@@ -1552,18 +1552,18 @@ my $guiConfFile = "$homePath/.easy-auto-multiple-choice";
 # 'project'
 # -> 'stack' : the gui stack of the project folder "not-set"/"set"
 # -> 'label' : the displayed project file path label when set
-# -> 'path'  : set if a project path was given
+# -> 'path'  : set if a project path was given (full path)
 #
 # 'students'
 # -> 'stack' : the gui stack of the student CSV list "not-set"/"set"/"error"
 # -> 'label' : the displayed students CSV file name label
-# -> 'path'  : set if a student CSV file is associated to the project
-# -> 'error-label' : the error label displayed
+# -> 'path'  : set if a student CSV file is associated to the project (full path)
+# -> 'error-label' : the error label displayed 
 #
 # 'test'
 # -> 'stack' : the gui stack of the test source "not-set"/"set"/"error"
 # -> 'label' : the displayed test source file name label
-# -> 'path'  : set if a test source is associated to the project
+# -> 'path'  : set if a test source is associated to the project (full path)
 # -> 'error-label' : the error label displayed
 #
 # 'steps-done'
@@ -1872,14 +1872,21 @@ sub checkProjectDirectory {
 # called when changing project directory #
 sub setProjectDirectory {
 
+   my ($newWorkingPath, $checkDir) = @_;
+   if( ! $checkDir ) {
+      $checkDir = 'true';
+   }
+
    # set working path #
    my $saveWorkingPath = $workingPath;
-   $workingPath = $_[0];
+   $workingPath = $newWorkingPath;
 
    # check if we can use it as project dir #
-   if( checkProjectDirectoryValid() ne 'true' ) {
-      $workingPath = $saveWorkingPath;
-      return;
+   if( $checkDir ne 'false' ) {
+      if( checkProjectDirectoryValid() ne 'true' ) {
+	 $workingPath = $saveWorkingPath;
+	 return;
+      }
    }
 
    # save current project directory in conf file #
@@ -1927,15 +1934,66 @@ sub chooseProjectDirectory {
 
 
    # check result #
+   my $newProjectDir = '';
    my $response = $directoryChooser->run();
    if( $response eq 'accept' ) {
-
-      # get filename #
-      my $filename = decode('UTF-8', $directoryChooser->get_filename());
-      setProjectDirectory($filename);
-  
+      $newProjectDir = decode('UTF-8', $directoryChooser->get_filename());
    }
    $directoryChooser->destroy();
+
+   # change project dir if needed {
+   if( $newProjectDir ) {
+      setProjectDirectory($newProjectDir);
+   }
+}
+
+
+sub copyProjectFiles {
+
+   # create a directory chooser dialog #
+   my $directoryChooser = Gtk3::FileChooserDialog->new("Nouveau dossier de projet",
+                                                       $mainWindow,
+                                                       'select-folder',
+                                                       "Choisir",
+                                                       'accept',
+                                                       "Annuler",
+                                                       'cancel');
+
+
+
+   # check result #
+   my $targetDir = '';
+   my $response = $directoryChooser->run();
+   if( $response eq 'accept' ) {
+      $targetDir = decode('UTF-8', $directoryChooser->get_filename());
+   }
+   $directoryChooser->destroy();
+   
+   if( $targetDir ) {
+
+      # check if the directory is empty #
+      my @targetDirFiles = glob("$targetDir/*");
+      if( @targetDirFiles ) {
+	 my $overwriteResponse = askYesOrNoDialog("Ce répertoire n'est pas vide ! Etes vous sûr de vouloir copier le projet dans ce répertoire ?");
+
+	 if( $overwriteResponse eq 'no' ) {
+	    return;
+	 }
+      }
+
+      # copy the files #
+      if( $guiState{'students'}{'path'} ) {
+	 copy("$guiState{'students'}{'path'}", $targetDir);
+      }
+      
+      if( $guiState{'test'}{'path'} ) {
+	 copy("$guiState{'test'}{'path'}", $targetDir);
+      }
+      
+      # update project directory #      
+      setProjectDirectory($targetDir, 'false');
+  
+   }
 }
 
 
@@ -2470,6 +2528,7 @@ $guiState{'window'} = $mainWindow;
 
 		     # copy button : copyButton #
 		     my $copyButton = Gtk3::Button->new("Copier vers");
+		     $copyButton->signal_connect('clicked', \&copyProjectFiles);
 		     $buttonsBox->pack_start($copyButton, 1, 0, 0);
 		  }
 	       }
