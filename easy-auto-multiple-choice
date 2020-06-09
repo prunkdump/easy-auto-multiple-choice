@@ -1352,7 +1352,7 @@ sub annotateScans {
    }
 
    # annotate from scans #
-   system("auto-multiple-choice annotate --cr '$workingPath/$amcPrivateDir/cr' --project '$workingPath/$amcPrivateDir/' --data '$workingPath/$amcPrivateDir/data' --subject '$workingPath/$amcPrivateDir/DOC-sujet.pdf' --corrected '$workingPath/$amcPrivateDir/DOC-indiv-solution.pdf' --filename-model '' --force-ascii --single-output ''  --sort l --id-file '' --progression-id annotate --progression 1 --line-width 2 --font-name 'Linux Libertine O 12' --symbols '0-0:none/#000000000000,0-1:circle/#ffff00000000,1-0:mark/#ffff00000000,1-1:box/#0000ffff0000' --no-indicatives --position 'marges' --dist-to-box '5.5' --n-digits '4' --verdict '%(ID)\n${markSentence}%s/%m (${scoreSentence}%S/%M)' --verdict-question '%s/%m' --verdict-question-cancelled 'X' --names-file '$workingPath/$amcPrivateDir/$inputCSVFileName' --names-encoding 'UTF-8' --csv-build-name '(name)' '(givenname)' --no-rtl --changes-only 1 --sort l --compose 1 --n-copies 0 --src '$workingPath/$amcPrivateDir/$testTEXFileName' --with pdflatex --filter latex --filtered-source '$workingPath/$amcPrivateDir/$baseTestTEXFileName' --embedded-max-size '1000x1500' --embedded-format jpeg --embedded-jpeg-quality 75 > /dev/null 2>&1");
+   system("auto-multiple-choice annotate --cr '$workingPath/$amcPrivateDir/cr' --project '$workingPath/$amcPrivateDir/' --data '$workingPath/$amcPrivateDir/data' --subject '$workingPath/$amcPrivateDir/DOC-sujet.pdf' --corrected '$workingPath/$amcPrivateDir/DOC-indiv-solution.pdf' --filename-model '' --force-ascii --single-output ''  --sort l --id-file '' --progression-id annotate --progression 1 --line-width 2 --font-name 'Linux Libertine O 12' --symbols '0-0:none/#000000000000,0-1:circle/#ffff00000000,1-0:mark/#ffff00000000,1-1:box/#0000ffff0000' --no-indicatives --position 'marges' --dist-to-box '5.5' --n-digits '4' --verdict '%(ID)\n${markSentence}%s/%m (${scoreSentence}%S/%M)' --verdict-question '%s/%m' --verdict-question-cancelled 'X' --names-file '$workingPath/$amcPrivateDir/$inputCSVFileName' --names-encoding 'UTF-8' --csv-build-name '(name) (givenname)' --no-rtl --changes-only 1 --sort l --compose 1 --n-copies 0 --src '$workingPath/$amcPrivateDir/$testTEXFileName' --with pdflatex --filter latex --filtered-source '$workingPath/$amcPrivateDir/$baseTestTEXFileName' --embedded-max-size '1000x1500' --embedded-format jpeg --embedded-jpeg-quality 75 > /dev/null 2>&1");
 
    # get the scan ordered student list #
    my @scanOrderedStudentsIds = getScanOrderedStudentsIds();
@@ -1427,12 +1427,12 @@ sub readCopies {
 
    # associate students #
    print("Associating students...   ");
-   system("auto-multiple-choice association-auto --data '$workingPath/$amcPrivateDir/data' --notes-id '<preassoc>' --liste '$workingPath/$amcPrivateDir/$inputCSVFileName' --liste-key id --csv-build-name '(name)' '(givenname)' --encodage-liste UTF-8 --pre-association > /dev/null 2>&1");
+   system("auto-multiple-choice association-auto --data '$workingPath/$amcPrivateDir/data' --notes-id '<preassoc>' --liste '$workingPath/$amcPrivateDir/$inputCSVFileName' --liste-key id --csv-build-name '(name) (givenname)' --encodage-liste UTF-8 --pre-association > /dev/null 2>&1");
    print("Done.\n");
 
    # generate results #
    print("Generating results...   ");
-   system("auto-multiple-choice export --module CSV --data '$workingPath/$amcPrivateDir/data' --useall  --sort n --fich-noms '$workingPath/$amcPrivateDir/$inputCSVFileName' --noms-encodage UTF-8 --csv-build-name '(name)' '(givenname)' --no-rtl --output '$workingPath/$amcPrivateDir/exports/results.csv' --option-out 'encodage=UTF-8' --option-out 'separateur=,' --option-out 'columns=student.copy,student.key,student.name' --option-out 'decimal=,' --option-out 'ticked=' > /dev/null 2>&1");
+   system("auto-multiple-choice export --module CSV --data '$workingPath/$amcPrivateDir/data' --useall  --sort n --fich-noms '$workingPath/$amcPrivateDir/$inputCSVFileName' --noms-encodage UTF-8 --csv-build-name '(name) (givenname)' --no-rtl --output '$workingPath/$amcPrivateDir/exports/results.csv' --option-out 'encodage=UTF-8' --option-out 'separateur=,' --option-out 'columns=student.copy,student.key,student.name' --option-out 'decimal=,' --option-out 'ticked=' > /dev/null 2>&1");
    print("Done.\n");
 
 
