@@ -1,0 +1,40 @@
+###############################################
+#                                             #
+#      easy-auto-multiple-choice              #
+#                                             #
+###############################################
+
+A minimal auto-multiple-choice CLI/GUI
+
+Install :
+---------
+
+easy-auto-multiple-choice has the same dependencies than 
+auto-multiple-choice :
+https://www.auto-multiple-choice.net
+
+So just install your auto-multiple-choice package and
+copy the easy-auto-multiple-choice script in your
+binary directory (usually /usr/bin, don't forget to
+chmod +x it).
+
+
+Usage :
+-------
+
+To launch the GUI just run the script with the "gui"
+parameter :
+
+easy-auto-multiple-choice gui
+
+
+Here the complete CLI/GUI usage :
+
+usage : easy-auto-multiple-choice [working_path] <action>
+Possible actions are :
+   gui          : launch the GUI
+   set-students : read student list from CSV file
+   edit-test    : launch the test editor
+   build-test   : build a printable test
+   read-copies  : read copies from scans
+   clean        : clean all files except test source and student list
