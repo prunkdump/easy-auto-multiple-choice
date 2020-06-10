@@ -1693,6 +1693,8 @@ sub checkStudents {
       delete $guiState{'students'}{'path'};
       delete $guiState{'steps-done'}{'set-students'};
       $guiState{'students'}{'stack'}->set_visible_child_name('not-set');
+      $guiState{'students'}{'label'}->set_text('');
+      $guiState{'students'}{'error-label'}->set_text('');
    }
 
    elsif( $result[0] eq 'multiple-files' ) {
@@ -1701,6 +1703,7 @@ sub checkStudents {
       delete $guiState{'students'}{'path'};
       delete $guiState{'steps-done'}{'set-students'};
       $guiState{'students'}{'error-label'}->set_markup("<span foreground=\"red\">Erreur ! Plusieurs listes d'élèves CSV sont présentes dans le dossier du projet. Veuillez en garder une seule et actualisez.</span>");
+      $guiState{'students'}{'label'}->set_text('');
       $guiState{'students'}{'stack'}->set_visible_child_name('error');
    }
 
@@ -1709,11 +1712,12 @@ sub checkStudents {
       delete $guiState{'students'}{'path'};
       delete $guiState{'steps-done'}{'set-students'};
       if( defined($result[1]) ) {
-	 $guiState{'students'}{'label'}->set_markup("<span foreground=\"red\">Erreur ! $result[1]</span>");
+	 $guiState{'students'}{'error-label'}->set_markup("<span foreground=\"red\">Erreur ! $result[1]</span>");
       } else {
-	 $guiState{'students'}{'label'}->set_markup("<span foreground=\"red\">Une erreur s'est produite lors de la lecture de la liste CSV des élèves. Veuillez vérifier cette liste et actualisez.</span>");
+	 $guiState{'students'}{'error-label'}->set_markup("<span foreground=\"red\">Une erreur s'est produite lors de la lecture de la liste CSV des élèves. Veuillez vérifier cette liste et actualisez.</span>");
       }
-      $guiState{'students'}{'stack'}->set_visible_child_name('not-set');
+      $guiState{'students'}{'label'}->set_text('');
+      $guiState{'students'}{'stack'}->set_visible_child_name('error');
    }
 
    # csv file found #
@@ -1723,7 +1727,7 @@ sub checkStudents {
       # remove ok #
       shift(@result);
 
-      # get scsv file #
+      # get csv file #
       $guiState{'students'}{'path'} = shift(@result);
       my $csvFile = (File::Spec->splitpath($guiState{'students'}{'path'}))[2];
 
@@ -1751,6 +1755,7 @@ sub checkStudents {
 
       # set gui #
       $guiState{'students'}{'label'}->set_markup("<span foreground=\"green\">$studentsLabel</span>");
+      $guiState{'students'}{'error-label'}->set_text('');
       $guiState{'students'}{'stack'}->set_visible_child_name('set');
       
       # set students always done #
@@ -2484,6 +2489,7 @@ sub openComboFile {
 
 # create main window #
 $mainWindow = Gtk3::Window->new('toplevel');
+$mainWindow->set_resizable(0);
 $mainWindow->set_border_width(15);
 $guiState{'window'} = $mainWindow;
 {
@@ -2738,6 +2744,7 @@ $guiState{'window'} = $mainWindow;
 
 			   # file name test : filenameText #
 			   my $filenameText = Gtk3::Label->new();
+			   $filenameText->set_line_wrap(1);
 			   $flBox->pack_start($filenameText, 0, 0, 0);
 			   $guiState{'test'}{'label'} = $filenameText;
 			}
