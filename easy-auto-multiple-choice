@@ -1716,18 +1716,43 @@ sub checkStudents {
       $guiState{'students'}{'stack'}->set_visible_child_name('not-set');
    }
 
+   # csv file found #
+   # read result    #
    else {
 
-      # csv file found #
-      my $studentCount = $result[2];
-      $guiState{'students'}{'path'} = $result[1];
-      if( $studentCount == 1 ) {
-	 $guiState{'students'}{'label'}->set_markup("<span foreground=\"green\">$studentCount élève sera évalué</span>");
-      }else {
-	 $guiState{'students'}{'label'}->set_markup("<span foreground=\"green\">$studentCount élèves seront évalués</span>");
-      }
-      $guiState{'students'}{'stack'}->set_visible_child_name('set');
+      # remove ok #
+      shift(@result);
 
+      # get scsv file #
+      $guiState{'students'}{'path'} = shift(@result);
+      my $csvFile = (File::Spec->splitpath($guiState{'students'}{'path'}))[2];
+
+      # get student count #
+      my $studentCount = shift(@result);
+
+      # get groups #
+      my @studentGroupList = @result;
+      
+      # generate label string #
+      my $studentsLabel;
+      if( $studentCount == 1 ) {
+	 $studentsLabel = "$studentCount élève sera évalué.";
+      } else {
+	 $studentsLabel = "$studentCount élèves seront évalués.";
+      }
+
+      $studentsLabel = "$csvFile : $studentsLabel";
+
+      if( @studentGroupList == 1) {
+	 $studentsLabel = "$studentsLabel\nGroupe : " . $studentGroupList[0];
+      } elsif( @studentGroupList > 1 ) {
+	 $studentsLabel = "$studentsLabel\nGroupes : " . join(', ', @studentGroupList);
+      }
+
+      # set gui #
+      $guiState{'students'}{'label'}->set_markup("<span foreground=\"green\">$studentsLabel</span>");
+      $guiState{'students'}{'stack'}->set_visible_child_name('set');
+      
       # set students always done #
       $guiState{'steps-done'}{'set-students'} = "true";
    }
@@ -2625,6 +2650,7 @@ $guiState{'window'} = $mainWindow;
 			   
 			   # student number text label #
 			   my $studentLabel = Gtk3::Label->new();
+			   $studentLabel->set_line_wrap(1);
 			   $guiState{'students'}{'label'} = $studentLabel;
 			   $flBox->pack_start($studentLabel, 0, 0, 0);
 			}
