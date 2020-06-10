@@ -40,9 +40,8 @@ use Gtk3 -init;
 use Encode qw(decode encode);
 use Glib;
 
-use File::HomeDir;
-my $homePath = File::HomeDir->my_home;
-
+my $homePath = $ENV{"HOME"};
+print("$homePath\n");
 
 ######################
 # localized contants #
