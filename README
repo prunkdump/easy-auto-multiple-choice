@@ -9,13 +9,13 @@ A minimal auto-multiple-choice CLI/GUI
 Install :
 ---------
 
-easy-auto-multiple-choice has the same dependencies than 
-auto-multiple-choice :
+To use easy-auto-multiple-choice you need to install
+auto-multiple-choice, pdftk and imagemagick.
 https://www.auto-multiple-choice.net
 
-So just install your auto-multiple-choice package and
-copy the easy-auto-multiple-choice script in your
-binary directory (usually /usr/bin, don't forget to
+So just install these packages and copy the 
+easy-auto-multiple-choice script in your binary 
+directory (usually /usr/bin, don't forget to
 chmod +x it).
 
 
