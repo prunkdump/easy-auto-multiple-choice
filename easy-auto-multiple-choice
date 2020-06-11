@@ -1452,7 +1452,7 @@ sub readCopies {
 
    # generate results #
    print("Generating results...   ");
-   system("auto-multiple-choice export --module CSV --data '$workingPath/$amcPrivateDir/data' --useall  --sort n --fich-noms '$workingPath/$amcPrivateDir/$inputCSVFileName' --noms-encodage UTF-8 --csv-build-name '(name) (givenname)' --no-rtl --output '$workingPath/$amcPrivateDir/exports/results.csv' --option-out 'encodage=UTF-8' --option-out 'separateur=,' --option-out 'columns=student.copy,student.key,student.name' --option-out 'decimal=,' --option-out 'ticked=' > /dev/null 2>&1");
+   system("auto-multiple-choice export --module CSV --data '$workingPath/$amcPrivateDir/data' --useall  --sort n --fich-noms '$workingPath/$amcPrivateDir/$inputCSVFileName' --noms-encodage UTF-8 --csv-build-name '(name) (givenname)' --no-rtl --output '$workingPath/$amcPrivateDir/exports/results.csv' --option-out 'encodage=UTF-8' --option-out 'separateur=;' --option-out 'columns=student.copy,student.key,student.name' --option-out 'decimal=,' --option-out 'ticked=' > /dev/null 2>&1");
    copy("$workingPath/$amcPrivateDir/exports/results.csv", "$workingPath/$detailledResultFileName");
    print("Done.\n");
 
@@ -1494,21 +1494,22 @@ sub readCopies {
    #################
 
    # read the export #
-   my $studentResults = csv(in => "$workingPath/$amcPrivateDir/exports/results.csv", headers => "auto");
+   my $studentResults = csv(in => "$workingPath/$amcPrivateDir/exports/results.csv", sep_char=> ";");
 
    # open output #
    open(my $resultFileHandle, '>:encoding(UTF-8)', "$workingPath/$resultFileName")
       or die "Could not open file '$workingPath/$resultFileName' $!";
 
    # write result #
+   shift(@$studentResults);
    foreach my $studentResult (@$studentResults) {
-      print $resultFileHandle "$studentResult->{Name}${resultFileSeparator}$studentResult->{Mark}\n";
+      print $resultFileHandle "$studentResult->[2]${resultFileSeparator}$studentResult->[3]\n";
    }
    close($resultFileHandle);
 
    # print #
    print("Result generated in : $workingPath/$resultFileName\n");
-   #print("Detailled result generated in : $workingPath/$detailledResultFileName");
+   print("Detailled result generated in : $workingPath/$detailledResultFileName\n");
    system("xdg-open $workingPath/$resultFileName&");  
 
 }
